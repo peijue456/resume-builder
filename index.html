@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大学生简历制作器</title>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script type="module">
+  import * as docxModule from 'https://esm.sh/docx@9.1.1';
+  window.docx = docxModule;
+  window.__docxReady = true;
+  document.dispatchEvent(new Event('docx-ready'));
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;color:#333;height:100vh;overflow:hidden;background:linear-gradient(135deg,#667eea 0%,#764ba2 50%,#f093fb 100%);background-attachment:fixed}
+input,textarea,select,button{font-family:inherit;font-size:inherit}
+
+/* ===== Top Bar ===== */
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:60px;background:rgba(255,255,255,.15);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.2);position:relative;z-index:100}
+.top-bar h1{font-size:20px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.2);white-space:nowrap}
+.top-bar h1 .emoji{margin-right:6px}
+.top-bar h1 .sub{font-size:12px;font-weight:400;opacity:.8;margin-left:8px}
+.top-bar-actions{display:flex;align-items:center;gap:10px}
+.tpl-selector{display:flex;gap:6px;align-items:center}
+.tpl-btn{padding:6px 14px;border:1.5px solid rgba(255,255,255,.4);border-radius:20px;background:rgba(255,255,255,.1);color:#fff;font-size:13px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.tpl-btn:hover{background:rgba(255,255,255,.25)}
+.tpl-btn.active{background:#fff;color:#764ba2;border-color:#fff;font-weight:600}
+.btn-export-wrap{position:relative}
+.btn-export{padding:8px 22px;background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff;border:none;border-radius:20px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(238,90,36,.3);display:flex;align-items:center;gap:6px}
+.btn-export:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(238,90,36,.4)}
+.btn-export .arrow{font-size:10px;transition:transform .2s}
+.btn-export-wrap.open .btn-export .arrow{transform:rotate(180deg)}
+.export-menu{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);overflow:hidden;opacity:0;visibility:hidden;transform:translateY(-8px);transition:all .2s;min-width:160px;z-index:200}
+.btn-export-wrap.open .export-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.export-menu-item{display:flex;align-items:center;gap:10px;padding:12px 18px;font-size:14px;color:#333;cursor:pointer;transition:background .15s;border:none;background:none;width:100%;text-align:left}
+.export-menu-item:hover{background:#f5f3ff;color:#764ba2}
+.export-menu-item .icon{font-size:18px}
+.btn-clear{padding:8px 16px;background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.3);border-radius:20px;font-size:13px;cursor:pointer;transition:all .2s}
+.btn-clear:hover{background:rgba(255,255,255,.3)}
+.btn-top{padding:8px 14px;background:rgba(255,255,255,.12);color:#fff;border:1.5px solid rgba(255,255,255,.25);border-radius:20px;font-size:13px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-top:hover{background:rgba(255,255,255,.25)}
+.btn-top:disabled{opacity:.4;cursor:not-allowed}
+.btn-top:disabled:hover{background:rgba(255,255,255,.12)}
+.save-indicator{font-size:12px;color:rgba(255,255,255,.7);white-space:nowrap;transition:color .2s}
+.save-indicator.saving{color:#ffd700}
+
+/* ===== Toast ===== */
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:rgba(0,0,0,.8);color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;z-index:9999;opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== JSON Modal ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal h3{font-size:18px;margin-bottom:16px;color:#333}
+.modal-btns{display:flex;gap:10px;margin-top:16px}
+.modal-btns button{flex:1;padding:10px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.modal-btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.modal-btn-primary:hover{box-shadow:0 4px 12px rgba(118,75,162,.3)}
+.modal-btn-secondary{background:#f3f4f6;color:#666}
+.modal-btn-secondary:hover{background:#e5e7eb}
+
+/* ===== Main Layout ===== */
+.main{display:flex;height:calc(100vh - 60px)}
+
+/* ===== Editor ===== */
+.editor{width:500px;min-width:420px;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-right:1px solid rgba(255,255,255,.3);overflow-y:auto;padding:20px}
+.editor::-webkit-scrollbar{width:6px}
+.editor::-webkit-scrollbar-thumb{background:rgba(118,75,162,.3);border-radius:3px}
+.module-section{margin-bottom:14px;border:1px solid rgba(118,75,162,.12);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:box-shadow .2s}
+.module-section:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.module-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 12px 36px;background:linear-gradient(135deg,rgba(102,126,234,.06),rgba(118,75,162,.06));cursor:pointer;user-select:none;transition:background .2s;position:relative}
+.mod-drag{position:absolute;left:10px;top:50%;transform:translateY(-50%);cursor:grab;width:14px;height:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:3px;transition:all .15s}
+.mod-drag:hover{background:rgba(118,75,162,.1)}
+.mod-drag i{display:block;width:10px;height:2px;background:#ccc;border-radius:1px}
+.mod-drag:hover i{background:#764ba2}
+.module-header:hover{background:linear-gradient(135deg,rgba(102,126,234,.12),rgba(118,75,162,.12))}
+.module-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:#2d3436}
+.module-title .icon{font-size:18px}
+.module-right{display:flex;align-items:center;gap:10px}
+.module-count{font-size:11px;color:#999;background:#f3f0ff;padding:2px 8px;border-radius:10px}
+.module-toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+.module-toggle input{opacity:0;width:0;height:0}
+.module-toggle .slider{position:absolute;inset:0;background:#ddd;border-radius:11px;cursor:pointer;transition:.2s}
+.module-toggle .slider:before{content:"";position:absolute;width:18px;height:18px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.module-toggle input:checked+.slider{background:linear-gradient(135deg,#667eea,#764ba2)}
+.module-toggle input:checked+.slider:before{transform:translateX(18px)}
+.module-chevron{font-size:11px;transition:transform .2s;color:#999}
+.module-section.open .module-chevron{transform:rotate(90deg)}
+.module-body{padding:0 16px;max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease}
+.module-section.open .module-body{max-height:5000px;padding:14px 16px 16px}
+.example-panel{background:linear-gradient(135deg,rgba(102,126,234,.08),rgba(240,147,251,.08));border:1px dashed rgba(118,75,162,.25);border-radius:8px;padding:12px;margin-bottom:14px}
+.example-toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:#764ba2;cursor:pointer;font-weight:500;user-select:none}
+.example-toggle:hover{color:#667eea}
+.example-content{display:none;margin-top:10px;font-size:13px;color:#555;line-height:1.7}
+.example-content.show{display:block}
+.example-content p{margin-bottom:4px}
+.example-content .ex-label{font-weight:600;color:#764ba2;font-size:12px;margin-top:6px}
+.btn-fill-example{margin-top:8px;padding:5px 14px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:15px;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-fill-example:hover{transform:scale(1.03);box-shadow:0 2px 8px rgba(118,75,162,.3)}
+.form-group{margin-bottom:10px}
+.form-group label{display:block;font-size:12px;color:#888;margin-bottom:3px;font-weight:500}
+.form-group input,.form-group textarea{width:100%;padding:8px 10px;border:1.5px solid #e8e8e8;border-radius:8px;font-size:13px;transition:all .2s;background:#fafafa}
+.form-group input:focus,.form-group textarea:focus{outline:none;border-color:#764ba2;background:#fff;box-shadow:0 0 0 3px rgba(118,75,162,.1)}
+.form-group textarea{resize:vertical;min-height:56px}
+.form-row{display:flex;gap:10px}
+.form-row .form-group{flex:1}
+.entry-card{background:linear-gradient(135deg,#f8f9ff,#f3f0ff);border:1px solid rgba(118,75,162,.1);border-radius:10px;padding:12px 12px 12px 32px;margin-bottom:10px;position:relative;transition:box-shadow .2s}
+.entry-card:hover{box-shadow:0 2px 12px rgba(118,75,162,.1)}
+.drag-handle{position:absolute;left:6px;top:50%;transform:translateY(-50%);cursor:grab;width:16px;height:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;user-select:none;transition:all .15s;border-radius:4px;padding:4px}
+.drag-handle:hover{background:rgba(118,75,162,.1)}
+.drag-handle i{display:block;width:10px;height:2px;background:#aaa;border-radius:1px}
+.drag-handle:hover i{background:#764ba2}
+.drag-handle:active{cursor:grabbing}
+.drop-zone-above{border-top:3px solid #764ba2!important;margin-top:-1px}
+.drop-zone-below{border-bottom:3px solid #764ba2!important;margin-bottom:-1px}
+.drag-ghost{position:fixed;z-index:10000;opacity:.85;pointer-events:none;transform:rotate(1deg);box-shadow:0 8px 30px rgba(0,0,0,.18);border-radius:10px;max-width:400px;overflow:hidden}
+body.drag-active{user-select:none;-webkit-user-select:none}
+.entry-card .btn-remove,.entry-card .btn-copy{position:absolute;top:8px;width:22px;height:22px;border:none;color:#fff;border-radius:50%;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.entry-card .btn-remove{right:8px;background:linear-gradient(135deg,#ff6b6b,#ee5a24)}
+.entry-card .btn-copy{right:34px;background:linear-gradient(135deg,#667eea,#764ba2)}
+.entry-card:hover .btn-remove,.entry-card:hover .btn-copy{opacity:1}
+.btn-add{width:100%;padding:9px;border:1.5px dashed rgba(118,75,162,.3);background:rgba(118,75,162,.03);border-radius:10px;color:#764ba2;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s}
+.btn-add:hover{border-color:#764ba2;background:rgba(118,75,162,.08)}
+.skill-input-wrap{display:flex;gap:8px;align-items:center}
+.skill-input-wrap input{flex:1}
+.skill-input-wrap button{padding:8px 16px;flex-shrink:0}
+.skill-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.skill-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:linear-gradient(135deg,rgba(102,126,234,.12),rgba(118,75,162,.12));color:#764ba2;border-radius:20px;font-size:13px;font-weight:500}
+.skill-tag button{border:none;background:none;color:#999;cursor:pointer;font-size:14px;line-height:1}
+.skill-tag button:hover{color:#ff4d4f}
+
+/* Photo Upload */
+.photo-upload-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:linear-gradient(135deg,rgba(102,126,234,.1),rgba(118,75,162,.1));border:1.5px dashed rgba(118,75,162,.3);border-radius:8px;font-size:12px;color:#764ba2;cursor:pointer;transition:all .2s;margin-top:4px}
+.photo-upload-btn:hover{border-color:#764ba2;background:rgba(118,75,162,.15)}
+
+/* Character Count */
+.char-count{font-size:11px;color:#aaa;text-align:right;margin-top:2px}
+
+/* Markdown Preview */
+.md-preview-area{background:#f9fafb;border:1.5px solid #e8e8e8;border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.7;color:#374151;min-height:56px}
+.md-preview-area strong{font-weight:700;color:#111}
+.md-preview-area ul{padding-left:18px;margin:4px 0}
+.md-preview-area li{margin-bottom:2px}
+
+/* ===== Preview ===== */
+.preview-wrap{flex:1;overflow:auto;padding:30px;display:flex;justify-content:center;align-items:flex-start}
+.preview-wrap::-webkit-scrollbar{width:8px}
+.preview-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.3);border-radius:4px}
+
+/* ===== Resume Base ===== */
+.resume{width:210mm;min-height:297mm;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.12);font-size:13px;line-height:1.6;color:#333;flex-shrink:0;overflow:hidden}
+
+/* =============================================
+   1. 经典单栏 — 最通用，适合所有行业
+   结构：姓名居中 + 联系方式 + 分节内容
+   ============================================= */
+.tpl-classic{padding:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.tpl-classic .hd{padding:28px 40px 20px;text-align:center;border-bottom:1px solid #d1d5db}
+.tpl-classic .hd-photo{width:72px;height:90px;border-radius:4px;object-fit:cover;border:1px solid #d1d5db;margin:0 auto 8px;display:block}
+.tpl-classic .hd-name{font-size:24px;font-weight:700;color:#111;letter-spacing:3px}
+.tpl-classic .hd-obj{font-size:13px;color:#555;margin-top:4px}
+.tpl-classic .hd-contact{display:flex;gap:20px;justify-content:center;margin-top:10px;font-size:12px;color:#666}
+.tpl-classic .hd-contact span{display:flex;align-items:center;gap:4px}
+.tpl-classic .bd{padding:20px 40px 36px}
+.tpl-classic .sec{margin-bottom:20px}
+.tpl-classic .sec-tt{font-size:14px;font-weight:700;color:#111;padding-bottom:6px;margin-bottom:12px;border-bottom:1px solid #d1d5db;letter-spacing:1px}
+.tpl-classic .it{margin-bottom:11px}
+.tpl-classic .it-hd{display:flex;justify-content:space-between;align-items:baseline}
+.tpl-classic .it-name{font-size:13px;font-weight:600;color:#111}
+.tpl-classic .it-time{font-size:12px;color:#888;white-space:nowrap}
+.tpl-classic .it-sub{font-size:12px;color:#555;margin-top:1px}
+.tpl-classic .it-desc{font-size:12px;color:#333;margin-top:3px;line-height:1.7}
+.tpl-classic .it-desc ul{padding-left:18px}
+.tpl-classic .it-desc li{margin-bottom:1px}
+.tpl-classic .it-desc li::marker{color:#555}
+.tpl-classic .it-desc strong{font-weight:700}
+.tpl-classic .sk-grid{display:flex;flex-wrap:wrap;gap:6px}
+.tpl-classic .sk-tag{padding:3px 12px;background:#f3f4f6;color:#333;border-radius:3px;font-size:12px}
+.tpl-classic .self-tx{font-size:12px;color:#333;line-height:1.8;text-align:justify}
+.tpl-classic .self-tx strong{font-weight:700}
+
+/* =============================================
+   2. 侧边信息 — 左侧个人信息栏，右侧主体
+   结构：左侧窄栏放照片/联系方式/技能，右侧放经历
+   适合：互联网、技术岗，信息量大的简历
+   ============================================= */
+.tpl-sidebar{display:flex;min-height:297mm;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.tpl-sidebar .side{width:200px;background:#f5f5f5;padding:28px 20px;flex-shrink:0;border-right:1px solid #e5e5e5}
+.tpl-sidebar .side-photo{width:80px;height:100px;border-radius:4px;object-fit:cover;border:1px solid #ddd;margin:0 auto 12px;display:block}
+.tpl-sidebar .side-name{font-size:18px;font-weight:700;color:#111;text-align:center;letter-spacing:1px}
+.tpl-sidebar .side-obj{font-size:12px;color:#666;text-align:center;margin-top:4px}
+.tpl-sidebar .side-line{height:1px;background:#ddd;margin:16px 0}
+.tpl-sidebar .side-sec{margin-bottom:18px}
+.tpl-sidebar .side-tt{font-size:11px;font-weight:700;color:#333;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #ddd}
+.tpl-sidebar .side-item{font-size:12px;color:#444;margin-bottom:5px;line-height:1.5}
+.tpl-sidebar .side-item strong{display:block;font-size:11px;color:#999;font-weight:500;margin-bottom:1px}
+.tpl-sidebar .side-sk{margin-bottom:6px}
+.tpl-sidebar .side-sk-nm{font-size:12px;color:#333;margin-bottom:2px;display:flex;justify-content:space-between}
+.tpl-sidebar .side-sk-nm span{color:#999;font-size:11px}
+.tpl-sidebar .side-sk-bar{height:3px;background:#e5e5e5;border-radius:2px;overflow:hidden}
+.tpl-sidebar .side-sk-fill{height:100%;background:#555;border-radius:2px}
+.tpl-sidebar .main-sec{flex:1;padding:28px 32px 36px}
+.tpl-sidebar .sec{margin-bottom:20px}
+.tpl-sidebar .sec-tt{font-size:14px;font-weight:700;color:#111;padding-bottom:6px;margin-bottom:12px;border-bottom:1px solid #e5e5e5}
+.tpl-sidebar .it{margin-bottom:11px}
+.tpl-sidebar .it-hd{display:flex;justify-content:space-between;align-items:baseline}
+.tpl-sidebar .it-name{font-size:13px;font-weight:600;color:#111}
+.tpl-sidebar .it-time{font-size:12px;color:#888;white-space:nowrap}
+.tpl-sidebar .it-sub{font-size:12px;color:#555;margin-top:1px}
+.tpl-sidebar .it-desc{font-size:12px;color:#333;margin-top:3px;line-height:1.7}
+.tpl-sidebar .it-desc ul{padding-left:18px}
+.tpl-sidebar .it-desc li{margin-bottom:1px}
+.tpl-sidebar .it-desc li::marker{color:#555}
+.tpl-sidebar .it-desc strong{font-weight:700}
+.tpl-sidebar .sk-grid{display:flex;flex-wrap:wrap;gap:6px}
+.tpl-sidebar .sk-tag{padding:3px 10px;background:#f5f5f5;color:#333;border-radius:3px;font-size:11.5px}
+.tpl-sidebar .self-tx{font-size:12px;color:#333;line-height:1.7}
+.tpl-sidebar .self-tx strong{font-weight:700}
+
+/* =============================================
+   3. 模块标题左对齐 — 现代简洁，标题无装饰
+   结构：左对齐头部，紧凑间距，无色块
+   适合：金融、咨询、管培等正式岗位
+   ============================================= */
+.tpl-modern{padding:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.tpl-modern .hd{padding:28px 40px 18px;display:flex;align-items:center;gap:20px;border-bottom:1px solid #e5e5e5}
+.tpl-modern .hd-info{flex:1}
+.tpl-modern .hd-photo{width:72px;height:90px;border-radius:4px;object-fit:cover;border:1px solid #ddd}
+.tpl-modern .hd-name{font-size:22px;font-weight:700;color:#111;letter-spacing:1px}
+.tpl-modern .hd-obj{font-size:13px;color:#555;margin-top:4px}
+.tpl-modern .hd-contact{display:flex;gap:16px;margin-top:8px;font-size:12px;color:#666}
+.tpl-modern .hd-contact span{display:flex;align-items:center;gap:4px}
+.tpl-modern .bd{padding:20px 40px 36px}
+.tpl-modern .sec{margin-bottom:20px}
+.tpl-modern .sec-tt{font-size:14px;font-weight:700;color:#111;padding-bottom:6px;margin-bottom:12px;border-bottom:1px solid #e5e5e5}
+.tpl-modern .it{margin-bottom:11px}
+.tpl-modern .it-hd{display:flex;justify-content:space-between;align-items:baseline}
+.tpl-modern .it-name{font-size:13px;font-weight:600;color:#111}
+.tpl-modern .it-time{font-size:12px;color:#888;white-space:nowrap}
+.tpl-modern .it-sub{font-size:12px;color:#555;margin-top:1px}
+.tpl-modern .it-desc{font-size:12px;color:#333;margin-top:3px;line-height:1.7}
+.tpl-modern .it-desc ul{padding-left:18px}
+.tpl-modern .it-desc li{margin-bottom:1px}
+.tpl-modern .it-desc li::marker{color:#555}
+.tpl-modern .it-desc strong{font-weight:700}
+.tpl-modern .sk-grid{display:flex;flex-wrap:wrap;gap:6px}
+.tpl-modern .sk-tag{padding:3px 12px;background:#f5f5f5;color:#333;border-radius:3px;font-size:12px}
+.tpl-modern .self-tx{font-size:12px;color:#333;line-height:1.8;text-align:justify}
+.tpl-modern .self-tx strong{font-weight:700}
+
+/* =============================================
+   4. 深色侧边 — 侧边栏深色背景，对比鲜明
+   结构：深色左侧栏 + 白色右侧主体
+   适合：设计、市场、传媒等需要展示个性的岗位
+   ============================================= */
+.tpl-darkside{display:flex;min-height:297mm;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.tpl-darkside .side{width:200px;background:#1e293b;padding:28px 20px;flex-shrink:0;color:#e2e8f0}
+.tpl-darkside .side-photo{width:80px;height:100px;border-radius:4px;object-fit:cover;border:2px solid #475569;margin:0 auto 12px;display:block}
+.tpl-darkside .side-name{font-size:18px;font-weight:700;color:#fff;text-align:center;letter-spacing:1px}
+.tpl-darkside .side-obj{font-size:12px;color:#94a3b8;text-align:center;margin-top:4px}
+.tpl-darkside .side-line{height:1px;background:#334155;margin:16px 0}
+.tpl-darkside .side-sec{margin-bottom:18px}
+.tpl-darkside .side-tt{font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #334155}
+.tpl-darkside .side-item{font-size:12px;color:#cbd5e1;margin-bottom:5px;line-height:1.5}
+.tpl-darkside .side-item strong{display:block;font-size:11px;color:#64748b;font-weight:500;margin-bottom:1px}
+.tpl-darkside .side-sk{margin-bottom:6px}
+.tpl-darkside .side-sk-nm{font-size:12px;color:#e2e8f0;margin-bottom:2px;display:flex;justify-content:space-between}
+.tpl-darkside .side-sk-nm span{color:#64748b;font-size:11px}
+.tpl-darkside .side-sk-bar{height:3px;background:#334155;border-radius:2px;overflow:hidden}
+.tpl-darkside .side-sk-fill{height:100%;background:#60a5fa;border-radius:2px}
+.tpl-darkside .main-sec{flex:1;padding:28px 32px 36px}
+.tpl-darkside .sec{margin-bottom:20px}
+.tpl-darkside .sec-tt{font-size:14px;font-weight:700;color:#111;padding-bottom:6px;margin-bottom:12px;border-bottom:1px solid #e5e5e5}
+.tpl-darkside .it{margin-bottom:11px}
+.tpl-darkside .it-hd{display:flex;justify-content:space-between;align-items:baseline}
+.tpl-darkside .it-name{font-size:13px;font-weight:600;color:#111}
+.tpl-darkside .it-time{font-size:12px;color:#888;white-space:nowrap}
+.tpl-darkside .it-sub{font-size:12px;color:#555;margin-top:1px}
+.tpl-darkside .it-desc{font-size:12px;color:#333;margin-top:3px;line-height:1.7}
+.tpl-darkside .it-desc ul{padding-left:18px}
+.tpl-darkside .it-desc li{margin-bottom:1px}
+.tpl-darkside .it-desc li::marker{color:#555}
+.tpl-darkside .it-desc strong{font-weight:700}
+.tpl-darkside .sk-grid{display:flex;flex-wrap:wrap;gap:6px}
+.tpl-darkside .sk-tag{padding:3px 10px;background:#f5f5f5;color:#333;border-radius:3px;font-size:11.5px}
+.tpl-darkside .self-tx{font-size:12px;color:#333;line-height:1.7}
+.tpl-darkside .self-tx strong{font-weight:700}
+
+/* =============================================
+   5. 紧凑双栏 — 正文区域分两栏排列
+   结构：顶部通栏头部 + 正文左右分栏
+   适合：内容多需要节省空间，实习/项目经历丰富的同学
+   ============================================= */
+.tpl-compact{padding:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.tpl-compact .hd{padding:24px 40px 16px;display:flex;align-items:center;gap:20px;border-bottom:1px solid #d1d5db}
+.tpl-compact .hd-info{flex:1}
+.tpl-compact .hd-photo{width:64px;height:80px;border-radius:4px;object-fit:cover;border:1px solid #d1d5db}
+.tpl-compact .hd-name{font-size:22px;font-weight:700;color:#111;letter-spacing:2px}
+.tpl-compact .hd-obj{font-size:13px;color:#555;margin-top:3px}
+.tpl-compact .hd-contact{display:flex;gap:16px;margin-top:6px;font-size:12px;color:#666}
+.tpl-compact .hd-contact span{display:flex;align-items:center;gap:4px}
+.tpl-compact .bd{padding:16px 40px 32px;display:flex;flex-wrap:wrap;gap:0 28px}
+.tpl-compact .sec{margin-bottom:16px;width:calc(50% - 14px)}
+.tpl-compact .sec-full{width:100%}
+.tpl-compact .sec-tt{font-size:13px;font-weight:700;color:#111;padding-bottom:5px;margin-bottom:10px;border-bottom:1px solid #e5e5e5}
+.tpl-compact .it{margin-bottom:9px}
+.tpl-compact .it-hd{display:flex;justify-content:space-between;align-items:baseline}
+.tpl-compact .it-name{font-size:12px;font-weight:600;color:#111}
+.tpl-compact .it-time{font-size:11px;color:#888;white-space:nowrap}
+.tpl-compact .it-sub{font-size:11px;color:#555;margin-top:1px}
+.tpl-compact .it-desc{font-size:11px;color:#333;margin-top:2px;line-height:1.6}
+.tpl-compact .it-desc ul{padding-left:16px}
+.tpl-compact .it-desc li{margin-bottom:1px}
+.tpl-compact .it-desc li::marker{color:#555}
+.tpl-compact .it-desc strong{font-weight:700}
+.tpl-compact .sk-grid{display:flex;flex-wrap:wrap;gap:5px}
+.tpl-compact .sk-tag{padding:2px 10px;background:#f3f4f6;color:#333;border-radius:3px;font-size:11px}
+.tpl-compact .self-tx{font-size:11px;color:#333;line-height:1.7;text-align:justify}
+.tpl-compact .self-tx strong{font-weight:700}
+
+/* ===== Export ===== */
+body.export-mode .editor,body.export-mode .top-bar{display:none!important}
+body.export-mode .main{display:block;height:auto}
+body.export-mode .preview-wrap{padding:0;background:#fff;overflow:visible}
+body.export-mode .resume{box-shadow:none;margin:0}
+@media(max-width:960px){.editor{width:100%;min-width:auto}.main{flex-direction:column}.preview-wrap{height:auto;min-height:60vh}.tpl-selector{display:none}}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="jsonModal">
+  <div class="modal">
+    <h3>导入简历数据</h3>
+    <p style="font-size:14px;color:#666;line-height:1.6">选择之前导出的 JSON 文件，将覆盖当前所有数据。</p>
+    <div class="modal-btns">
+      <button class="modal-btn-secondary" onclick="closeJsonModal()">取消</button>
+      <button class="modal-btn-primary" onclick="confirmImportJson()">选择文件并导入</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="jsonFileInput" accept=".json" style="display:none">
+
+<div class="top-bar">
+  <h1><span class="emoji">🎓</span>大学生简历制作器<span class="sub">让每一份简历都闪闪发光</span></h1>
+  <div class="top-bar-actions">
+    <span class="save-indicator" id="saveIndicator"></span>
+    <button class="btn-top" id="btnUndo" disabled title="撤销 (Ctrl+Z)">↩ 撤销</button>
+    <div class="tpl-selector" id="tplSelector">
+      <button class="tpl-btn active" data-tpl="classic">经典单栏</button>
+      <button class="tpl-btn" data-tpl="modern">现代简洁</button>
+      <button class="tpl-btn" data-tpl="sidebar">侧边信息</button>
+      <button class="tpl-btn" data-tpl="darkside">深色侧边</button>
+      <button class="tpl-btn" data-tpl="compact">紧凑双栏</button>
+    </div>
+    <button class="btn-top" id="btnExportJson">💾 导出JSON</button>
+    <button class="btn-top" id="btnImportJson">📂 导入JSON</button>
+    <button class="btn-clear" id="btnClear">清空重填</button>
+    <div class="btn-export-wrap" id="exportWrap">
+      <button class="btn-export" id="btnExport">📄 导出 <span class="arrow">▾</span></button>
+      <div class="export-menu">
+        <button class="export-menu-item" id="btnExportPDF"><span class="icon">📕</span> 导出 PDF</button>
+        <button class="export-menu-item" id="btnExportWord"><span class="icon">📘</span> 导出 Word</button>
+        <button class="export-menu-item" id="btnExportImg"><span class="icon">🖼️</span> 导出图片</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="editor" id="editor"></div>
+  <div class="preview-wrap">
+    <div class="resume tpl-classic" id="resumePreview"></div>
+  </div>
+</div>
+
+<script>
+const MODULES=[
+  {id:'basic',name:'基础信息',icon:'👤',single:true},
+  {id:'education',name:'教育经历',icon:'🎓'},
+  {id:'internship',name:'实习经历',icon:'💼'},
+  {id:'project',name:'项目经历',icon:'🚀'},
+  {id:'skill',name:'技能特长',icon:'⚡',single:true},
+  {id:'honor',name:'荣誉奖项',icon:'🏆'},
+  {id:'self',name:'自我评价',icon:'💬',single:true},
+  {id:'club',name:'社团经历',icon:'🎯'},
+  {id:'volunteer',name:'志愿者经历',icon:'🤝'},
+  {id:'cert',name:'证书资质',icon:'📜'},
+];
+
+const EXAMPLES={
+  basic:{name:'张明远',phone:'138-0000-8888',email:'zhangmingyuan@mail.com',wechat:'zmy_2024',objective:'前端开发工程师',photo:''},
+  education:[{school:'北京大学',major:'计算机科学与技术',degree:'本科',time:'2021.09 - 2025.06',gpa:'3.8/4.0（专业前5%）'}],
+  internship:[{company:'字节跳动',position:'前端开发实习生',time:'2024.06 - 2024.09',desc:'- 负责抖音创作者平台的前端页面开发，使用 React + TypeScript\n- 优化首屏加载性能，LCP 从 3.2s 降低至 1.8s\n- 参与组件库建设，封装 10+ 通用业务组件\n- 与产品、设计紧密协作，按时交付 3 个迭代需求'}],
+  project:[{name:'校园二手交易平台',role:'全栈开发 & 项目负责人',time:'2023.09 - 2024.01',desc:'- 独立完成前后端开发，前端使用 Vue3 + Vant，后端使用 Node.js + MySQL\n- 实现商品发布、搜索、即时聊天、在线支付等核心功能\n- 采用 WebSocket 实现实时消息推送，日活用户 500+\n- 项目获校级创新创业大赛一等奖'}],
+  skill:['JavaScript','TypeScript','React','Vue.js','Node.js','Git','MySQL','Webpack','CSS3/HTML5','数据结构与算法'],
+  honor:[{title:'校级一等奖学金',issuer:'北京大学',time:'2023.12'},{title:'ACM-ICPC 区域赛银牌',issuer:'ICPC亚洲区组委会',time:'2023.11'},{title:'创新创业大赛一等奖',issuer:'北京大学',time:'2024.01'}],
+  self:'热爱前端开发，具备扎实的计算机基础和良好的编程习惯。在校期间积极参与项目实践和开源社区，拥有较强的学习能力和团队协作精神。善于分析和解决问题，对新技术保持高度热情，期望在前端领域持续深耕发展。',
+  club:[{org:'计算机协会',role:'技术部部长',time:'2022.09 - 2023.06',desc:'- 组织 10+ 场技术分享会和编程竞赛，参与人数累计 300+\n- 负责协会官方网站的开发与维护\n- 招新宣讲吸引 200+ 新成员加入'}],
+  volunteer:[{activity:'乡村支教志愿者',time:'2023.07 - 2023.08',desc:'- 前往贵州山区小学进行为期一个月的支教活动\n- 负责教授三年级至六年级的计算机基础课程\n- 为学校搭建简易多媒体教室，惠及 120+ 名学生'}],
+  cert:[{name:'CET-6 英语六级（580分）',time:'2023.06'},{name:'全国计算机等级考试四级',time:'2023.03'}]
+};
+
+function getDefaultData(){return{basic:{name:'',phone:'',email:'',wechat:'',objective:'',photo:''},education:[{school:'',major:'',degree:'',time:'',gpa:''}],internship:[{company:'',position:'',time:'',desc:''}],project:[{name:'',role:'',time:'',desc:''}],skill:[''],honor:[{title:'',issuer:'',time:''}],self:'',club:[{org:'',role:'',time:'',desc:''}],volunteer:[{activity:'',time:'',desc:''}],cert:[{name:'',time:''}]}}
+
+let resumeData=getDefaultData();
+let moduleEnabled={};MODULES.forEach(m=>moduleEnabled[m.id]=m.id==='basic');
+let openModules={basic:true};
+let currentTemplate='classic';
+let moduleOrder=MODULES.map(m=>m.id);
+
+// ===== Undo System =====
+let undoStack=[];
+const MAX_UNDO=30;
+function captureUndo(){undoStack.push(JSON.stringify(resumeData));if(undoStack.length>MAX_UNDO)undoStack.shift();document.getElementById('btnUndo').disabled=false}
+function undo(){if(!undoStack.length)return;resumeData=JSON.parse(undoStack.pop());if(!undoStack.length)document.getElementById('btnUndo').disabled=true;saveToLocal();renderEditor();renderPreview();showToast('已撤销')}
+document.getElementById('btnUndo').addEventListener('click',undo);
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){e.preventDefault();undo()}});
+
+// ===== Toast =====
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),2000)}
+
+// ===== Save Indicator =====
+function updateSaveIndicator(){const el=document.getElementById('saveIndicator');const now=new Date();const h=String(now.getHours()).padStart(2,'0');const m=String(now.getMinutes()).padStart(2,'0');const s=String(now.getSeconds()).padStart(2,'0');el.textContent='已保存 '+h+':'+m+':'+s;el.classList.add('saving');setTimeout(()=>el.classList.remove('saving'),800)}
+
+// ===== Local Storage =====
+function saveToLocal(){localStorage.setItem('resumeData',JSON.stringify(resumeData));localStorage.setItem('moduleEnabled',JSON.stringify(moduleEnabled));localStorage.setItem('template',currentTemplate);localStorage.setItem('moduleOrder',JSON.stringify(moduleOrder));updateSaveIndicator()}
+function loadFromLocal(){try{const d=JSON.parse(localStorage.getItem('resumeData'));const e=JSON.parse(localStorage.getItem('moduleEnabled'));const t=localStorage.getItem('template');const o=JSON.parse(localStorage.getItem('moduleOrder'));if(d)resumeData=Object.assign(getDefaultData(),d);if(e)moduleEnabled=Object.assign({},MODULES.reduce((a,m)=>{a[m.id]=false;return a},{}),e);if(t)currentTemplate=t;if(o&&o.length)moduleOrder=o}catch(e){}}
+
+// ===== Editor =====
+function renderEditor(){
+  const ed=document.getElementById('editor');
+  ed.innerHTML=moduleOrder.map(id=>MODULES.find(m=>m.id===id)).map(m=>{
+    const isOpen=openModules[m.id],enabled=moduleEnabled[m.id],hasEx=EXAMPLES[m.id]!==undefined;
+    let countHtml='';
+    if(!m.single){const entries=resumeData[m.id];const filled=entries?entries.filter(e=>Object.values(e).some(v=>v&&String(v).trim())).length:0;if(filled>0)countHtml=`<span class="module-count">${filled}</span>`}
+    return`<div class="module-section ${isOpen?'open':''}" data-module="${m.id}">
+      <div class="module-header" onclick="toggleModule('${m.id}')">
+        <span class="mod-drag" title="拖拽排序模块"><i></i><i></i><i></i></span>
+        <div class="module-title"><span class="icon">${m.icon}</span> ${m.name}</div>
+        <div class="module-right">
+          ${countHtml}
+          <label class="module-toggle" onclick="event.stopPropagation()"><input type="checkbox" ${enabled?'checked':''} onchange="toggleEnabled('${m.id}',this.checked)"><span class="slider"></span></label>
+          <span class="module-chevron">▶</span>
+        </div>
+      </div>
+      <div class="module-body">${hasEx?renderExPanel(m.id):''}${renderBody(m)}</div>
+    </div>`}).join('');
+  bindEditorEvents();
+}
+function renderExPanel(id){const ex=EXAMPLES[id];if(!ex)return'';let c='';if(id==='basic'){c=`<p><span class="ex-label">姓名：</span>${ex.name}　<span class="ex-label">意向：</span>${ex.objective}</p><p><span class="ex-label">手机：</span>${ex.phone}　<span class="ex-label">邮箱：</span>${ex.email}</p>`}else if(id==='skill'){c=`<p>${ex.join('、')}</p>`}else if(id==='self'){c=`<p>${ex.substring(0,60)}...</p>`}else if(Array.isArray(ex)){c=ex.map(e=>{const k=Object.keys(e);return`<p><span class="ex-label">${e[k[0]]}</span>${e.time?' — '+e.time:''}</p>`}).join('')}return`<div class="example-panel"><div class="example-toggle" onclick="toggleExample('${id}')">💡 查看${MODULES.find(m=>m.id===id).name}示例参考 <span id="exArrow_${id}">▸</span></div><div class="example-content" id="exContent_${id}">${c}<button class="btn-fill-example" onclick="fillExample('${id}')">✨ 一键填入示例</button></div></div>`}
+function renderBody(m){const d=resumeData[m.id];if(m.id==='basic')return renderBasic(d);if(m.id==='skill')return renderSkill(d);if(m.id==='self')return renderSelf(d);return renderEntries(m.id,d)}
+function renderBasic(d){return`<div class="form-group"><label>证件照</label>${d.photo?`<div style="margin-bottom:6px"><img src="${d.photo}" style="width:60px;height:75px;object-fit:cover;border-radius:4px;border:1.5px solid #e8e8e8"><button class="photo-upload-btn" style="margin-left:10px;vertical-align:middle" onclick="removePhoto()">移除照片</button></div>`:`<label class="photo-upload-btn">📷 上传证件照<input type="file" accept="image/*" style="display:none" onchange="handlePhoto(event)"></label>`}</div><div class="form-row"><div class="form-group"><label>姓名</label><input data-field="basic.name" value="${esc(d.name)}" placeholder="请输入姓名"></div><div class="form-group"><label>求职意向</label><input data-field="basic.objective" value="${esc(d.objective)}" placeholder="如：前端开发工程师"></div></div><div class="form-row"><div class="form-group"><label>手机号</label><input data-field="basic.phone" value="${esc(d.phone)}" placeholder="138-0000-0000"></div><div class="form-group"><label>邮箱</label><input data-field="basic.email" value="${esc(d.email)}" placeholder="your@email.com"></div></div><div class="form-group"><label>微信</label><input data-field="basic.wechat" value="${esc(d.wechat)}" placeholder="微信号（选填）"></div>`}
+function renderSkill(s){return`<div class="skill-input-wrap"><input type="text" id="skillInput" placeholder="输入技能后按回车添加"><button class="btn-add" style="width:auto;margin:0;padding:8px 14px" onclick="addSkill()">添加</button></div><div class="skill-tags" id="skillTags">${s.filter(x=>x).map((x,i)=>`<span class="skill-tag">${esc(x)}<button onclick="removeSkill(${i})">×</button></span>`).join('')}</div>`}
+function renderSelf(d){return`<div class="form-group"><label>自我评价</label><textarea data-field="self" rows="4" placeholder="简要描述你的优势、特长和职业规划...">${esc(d)}</textarea><div class="char-count">${d.length}/500</div></div>`}
+function renderEntries(modId,entries){
+  const F={education:[{key:'school',label:'学校'},{key:'major',label:'专业'},{key:'degree',label:'学历'},{key:'time',label:'时间'},{key:'gpa',label:'GPA/排名'}],internship:[{key:'company',label:'公司'},{key:'position',label:'职位'},{key:'time',label:'时间'},{key:'desc',label:'工作内容',type:'textarea'}],project:[{key:'name',label:'项目名称'},{key:'role',label:'角色'},{key:'time',label:'时间'},{key:'desc',label:'项目描述与成果',type:'textarea'}],honor:[{key:'title',label:'奖项名称'},{key:'issuer',label:'颁发机构'},{key:'time',label:'时间'}],club:[{key:'org',label:'组织名称'},{key:'role',label:'职务'},{key:'time',label:'时间'},{key:'desc',label:'活动描述',type:'textarea'}],volunteer:[{key:'activity',label:'活动名称'},{key:'time',label:'时间'},{key:'desc',label:'描述',type:'textarea'}],cert:[{key:'name',label:'证书名称'},{key:'time',label:'获得时间'}]};
+  const flds=F[modId]||[];
+  let html=entries.map((entry,idx)=>{let card=`<div class="entry-card" data-mod="${modId}" data-idx="${idx}"><span class="drag-handle" title="按住拖拽排序"><i></i><i></i><i></i></span><button class="btn-remove" onclick="removeEntry('${modId}',${idx})">×</button><button class="btn-copy" onclick="copyEntry('${modId}',${idx})" title="复制">⧉</button>`;flds.forEach(f=>{const val=esc(entry[f.key]||'');if(f.type==='textarea'){card+=`<div class="form-group"><label>${f.label}</label><div class="md-preview-wrap"><textarea data-field="${modId}.${idx}.${f.key}" rows="3">${val}</textarea><div class="md-preview-area" style="display:none"></div></div><div class="char-count">${val.length} 字</div></div>`}else{card+=`<div class="form-group"><label>${f.label}</label><input data-field="${modId}.${idx}.${f.key}" value="${val}"></div>`}});return card+'</div>'}).join('');
+  html+=`<button class="btn-add" onclick="addEntry('${modId}')">+ 添加${MODULES.find(m=>m.id===modId).name.replace(/经历|资质/,'条')}</button>`;return html;
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+// ===== Events =====
+let editorListenersAttached=false;
+function bindEditorEvents(){
+  if(editorListenersAttached)return;
+  const ed=document.getElementById('editor');
+
+  // Input events
+  ed.addEventListener('input',e=>{
+    const f=e.target.dataset.field;if(!f)return;
+    captureUndo();
+    const p=f.split('.');
+    if(p.length===2)resumeData[p[0]][p[1]]=e.target.value;
+    else if(p.length===3)resumeData[p[0]][parseInt(p[1])][p[2]]=e.target.value;
+    // Update char count
+    const cc=e.target.closest('.form-group')?.querySelector('.char-count');
+    if(cc)cc.textContent=e.target.value.length+(e.target.tagName==='TEXTAREA'?' 字':'');
+    saveToLocal();renderPreview();
+  });
+
+  // Skill input
+  ed.addEventListener('keydown',e=>{if(e.target.id==='skillInput'&&e.key==='Enter'){e.preventDefault();addSkill()}});
+
+  // Custom Drag & Drop (mousedown on handle)
+  let dragState=null;
+  ed.addEventListener('mousedown',e=>{
+    const handle=e.target.closest('.drag-handle');if(!handle)return;
+    const card=handle.closest('.entry-card');if(!card)return;
+    e.preventDefault();
+    const mod=card.dataset.mod;const idx=parseInt(card.dataset.idx);
+    const rect=card.getBoundingClientRect();
+    const ghost=card.cloneNode(true);
+    ghost.className='drag-ghost';ghost.style.width=rect.width+'px';
+    ghost.style.left=(rect.left+10)+'px';ghost.style.top=(rect.top+10)+'px';
+    document.body.appendChild(ghost);
+    document.body.classList.add('drag-active');
+    card.style.opacity='.3';
+    dragState={mod,idx,card,ghost,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top};
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragState)return;
+    dragState.ghost.style.left=(e.clientX-dragState.offsetX+10)+'px';
+    dragState.ghost.style.top=(e.clientY-dragState.offsetY+10)+'px';
+    // Highlight drop target
+    document.querySelectorAll('.drop-zone-above,.drop-zone-below').forEach(el=>{el.classList.remove('drop-zone-above','drop-zone-below')});
+    const cards=ed.querySelectorAll(`.entry-card[data-mod="${dragState.mod}"]`);
+    cards.forEach(c=>{
+      if(c===dragState.card)return;
+      const r=c.getBoundingClientRect();
+      const midY=r.top+r.height/2;
+      if(e.clientY>=r.top&&e.clientY<r.bottom){
+        if(e.clientY<midY)c.classList.add('drop-zone-above');
+        else c.classList.add('drop-zone-below');
+      }
+    });
+  });
+  document.addEventListener('mouseup',e=>{
+    if(!dragState)return;
+    // Find drop target
+    const cards=ed.querySelectorAll(`.entry-card[data-mod="${dragState.mod}"]`);
+    let toIdx=-1;
+    cards.forEach(c=>{
+      if(c===dragState.card)return;
+      if(c.classList.contains('drop-zone-above'))toIdx=parseInt(c.dataset.idx);
+      else if(c.classList.contains('drop-zone-below'))toIdx=parseInt(c.dataset.idx)+1;
+    });
+    // Cleanup
+    document.querySelectorAll('.drop-zone-above,.drop-zone-below').forEach(el=>{el.classList.remove('drop-zone-above','drop-zone-below')});
+    dragState.ghost.remove();dragState.card.style.opacity='';
+    document.body.classList.remove('drag-active');
+    // Apply reorder
+    if(toIdx>=0&&toIdx!==dragState.idx&&toIdx!==dragState.idx+1){
+      captureUndo();
+      const arr=resumeData[dragState.mod];
+      const item=arr.splice(dragState.idx,1)[0];
+      const insertAt=toIdx>dragState.idx?toIdx-1:toIdx;
+      arr.splice(insertAt,0,item);
+      saveToLocal();renderEditor();renderPreview();showToast('已调整顺序');
+    }
+    dragState=null;
+  });
+
+  // Markdown preview toggle (double-click textarea)
+  ed.addEventListener('dblclick',e=>{
+    if(e.target.tagName!=='TEXTAREA'||!e.target.dataset.field)return;
+    const wrap=e.target.closest('.md-preview-wrap');if(!wrap)return;
+    const preview=wrap.querySelector('.md-preview-area');
+    const isPreview=preview.style.display!=='none';
+    if(isPreview){preview.style.display='none';e.target.style.display=''}else{
+      e.target.style.display='none';
+      preview.innerHTML=renderMarkdown(e.target.value);
+      preview.style.display='block';
+    }
+  });
+
+  // Module Drag & Drop
+  let modDragState=null;
+  ed.addEventListener('mousedown',e=>{
+    const handle=e.target.closest('.mod-drag');if(!handle)return;
+    const section=handle.closest('.module-section');if(!section)return;
+    e.preventDefault();e.stopPropagation();
+    const modId=section.dataset.module;
+    const rect=section.getBoundingClientRect();
+    const ghost=section.cloneNode(true);ghost.className='module-section open';
+    ghost.style.cssText=`position:fixed;z-index:10000;opacity:.85;pointer-events:none;width:${rect.width}px;left:${rect.left+10}px;top:${rect.top+10}px;transform:rotate(1deg);box-shadow:0 8px 30px rgba(0,0,0,.18);border-radius:12px`;
+    document.body.appendChild(ghost);
+    document.body.classList.add('drag-active');
+    section.style.opacity='.3';
+    modDragState={modId,section,ghost,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top};
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!modDragState)return;
+    modDragState.ghost.style.left=(e.clientX-modDragState.offsetX+10)+'px';
+    modDragState.ghost.style.top=(e.clientY-modDragState.offsetY+10)+'px';
+    document.querySelectorAll('.drop-zone-above,.drop-zone-below').forEach(el=>{el.classList.remove('drop-zone-above','drop-zone-below')});
+    const sections=ed.querySelectorAll('.module-section');
+    sections.forEach(s=>{
+      if(s===modDragState.section)return;
+      const r=s.getBoundingClientRect();const midY=r.top+r.height/2;
+      if(e.clientY>=r.top&&e.clientY<r.bottom){
+        if(e.clientY<midY)s.classList.add('drop-zone-above');
+        else s.classList.add('drop-zone-below');
+      }
+    });
+  });
+  document.addEventListener('mouseup',e=>{
+    if(!modDragState)return;
+    const sections=ed.querySelectorAll('.module-section');
+    let targetId=null;let insertBefore=true;
+    sections.forEach(s=>{
+      if(s===modDragState.section)return;
+      if(s.classList.contains('drop-zone-above')){targetId=s.dataset.module;insertBefore=true}
+      else if(s.classList.contains('drop-zone-below')){targetId=s.dataset.module;insertBefore=false}
+    });
+    document.querySelectorAll('.drop-zone-above,.drop-zone-below').forEach(el=>{el.classList.remove('drop-zone-above','drop-zone-below')});
+    modDragState.ghost.remove();modDragState.section.style.opacity='';
+    document.body.classList.remove('drag-active');
+    if(targetId&&targetId!==modDragState.modId){
+      captureUndo();
+      const fromIdx=moduleOrder.indexOf(modDragState.modId);
+      moduleOrder.splice(fromIdx,1);
+      let toIdx=moduleOrder.indexOf(targetId);
+      if(!insertBefore)toIdx++;
+      moduleOrder.splice(toIdx,0,modDragState.modId);
+      saveToLocal();renderEditor();renderPreview();showToast('模块顺序已调整');
+    }
+    modDragState=null;
+  });
+
+  editorListenersAttached=true;
+}
+function toggleModule(id){openModules[id]=!openModules[id];const el=document.querySelector(`[data-module="${id}"]`);if(el)el.classList.toggle('open')}
+function toggleEnabled(id,val){moduleEnabled[id]=val;saveToLocal();renderPreview()}
+function toggleExample(id){const c=document.getElementById('exContent_'+id),a=document.getElementById('exArrow_'+id);if(c.classList.contains('show')){c.classList.remove('show');a.textContent='▸'}else{c.classList.add('show');a.textContent='▾'}}
+function fillExample(id){captureUndo();const ex=EXAMPLES[id];if(!ex)return;if(id==='basic')resumeData.basic={...ex};else if(id==='skill')resumeData.skill=[...ex];else if(id==='self')resumeData.self=ex;else if(Array.isArray(ex)){resumeData[id]=ex.map(e=>({...e}));moduleEnabled[id]=true}moduleEnabled[id]=true;saveToLocal();renderEditor();renderPreview();showToast('示例已填入')}
+function addEntry(modId){captureUndo();const T={education:{school:'',major:'',degree:'',time:'',gpa:''},internship:{company:'',position:'',time:'',desc:''},project:{name:'',role:'',time:'',desc:''},honor:{title:'',issuer:'',time:''},club:{org:'',role:'',time:'',desc:''},volunteer:{activity:'',time:'',desc:''},cert:{name:'',time:''}};resumeData[modId].push(T[modId]||{});openModules[modId]=true;saveToLocal();renderEditor();renderPreview()}
+function removeEntry(modId,idx){captureUndo();resumeData[modId].splice(idx,1);if(!resumeData[modId].length)resumeData[modId].push(getDefaultData()[modId][0]||{});saveToLocal();renderEditor();renderPreview()}
+function copyEntry(modId,idx){captureUndo();const copy=JSON.parse(JSON.stringify(resumeData[modId][idx]));resumeData[modId].splice(idx+1,0,copy);saveToLocal();renderEditor();renderPreview();showToast('已复制条目')}
+function addSkill(){captureUndo();const input=document.getElementById('skillInput');const v=input.value.trim();if(!v)return;resumeData.skill=resumeData.skill.filter(s=>s);resumeData.skill.push(v);input.value='';saveToLocal();renderEditor();renderPreview()}
+function removeSkill(idx){captureUndo();resumeData.skill.splice(idx,1);if(!resumeData.skill.length)resumeData.skill.push('');saveToLocal();renderEditor();renderPreview()}
+
+// ===== Photo =====
+function handlePhoto(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{captureUndo();resumeData.basic.photo=ev.target.result;saveToLocal();renderEditor();renderPreview();showToast('照片已上传')};reader.readAsDataURL(file)}
+function removePhoto(){captureUndo();resumeData.basic.photo='';saveToLocal();renderEditor();renderPreview();showToast('照片已移除')}
+
+// ===== Markdown =====
+function renderMarkdown(text){if(!text)return'';let html='';let inList=false;text.split('\n').forEach(line=>{let l=line.trim();if(!l){if(inList){html+='</ul>';inList=false}return}l=l.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');if(l.startsWith('- ')||l.startsWith('• ')){if(!inList){html+='<ul>';inList=true}html+='<li>'+l.replace(/^[-•]\s*/,'')+'</li>'}else{if(inList){html+='</ul>';inList=false}html+='<p>'+l+'</p>'}});if(inList)html+='</ul>';return html}
+
+// ===== Template Switch =====
+document.getElementById('tplSelector').addEventListener('click',e=>{const btn=e.target.closest('.tpl-btn');if(!btn)return;document.querySelectorAll('.tpl-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');currentTemplate=btn.dataset.tpl;saveToLocal();renderPreview()});
+
+// ===== Export Dropdown =====
+const exportWrap=document.getElementById('exportWrap');
+document.getElementById('btnExport').addEventListener('click',e=>{e.stopPropagation();exportWrap.classList.toggle('open')});
+document.addEventListener('click',e=>{if(!exportWrap.contains(e.target))exportWrap.classList.remove('open')});
+
+// ===== JSON Export/Import =====
+document.getElementById('btnExportJson').addEventListener('click',()=>{
+  const data={resumeData,moduleEnabled,currentTemplate,moduleOrder};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(resumeData.basic.name||'简历')+'_数据.json';
+  document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(a.href)},100);
+  showToast('JSON 已导出');
+});
+document.getElementById('btnImportJson').addEventListener('click',()=>document.getElementById('jsonModal').classList.add('show'));
+function closeJsonModal(){document.getElementById('jsonModal').classList.remove('show')}
+function confirmImportJson(){closeJsonModal();document.getElementById('jsonFileInput').click()}
+document.getElementById('jsonFileInput').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(data.resumeData){resumeData=Object.assign(getDefaultData(),data.resumeData)}
+      if(data.moduleEnabled){moduleEnabled=Object.assign({},MODULES.reduce((a,m)=>{a[m.id]=false;return a},{}),data.moduleEnabled)}
+      if(data.currentTemplate){currentTemplate=data.currentTemplate}
+      if(data.moduleOrder&&data.moduleOrder.length){moduleOrder=data.moduleOrder}
+      saveToLocal();
+      document.querySelectorAll('.tpl-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.tpl===currentTemplate));
+      renderEditor();renderPreview();showToast('数据导入成功');
+    }catch(err){showToast('JSON 文件格式错误')}
+  };
+  reader.readAsText(file);e.target.value='';
+});
+
+// ===== Preview =====
+function renderPreview(){
+  const d=resumeData,tpl=currentTemplate,el=document.getElementById('resumePreview');
+  el.className='resume tpl-'+tpl;
+  const order=moduleOrder.filter(id=>id!=='basic');
+  const isDual=tpl==='sidebar'||tpl==='darkside';
+  let mainHtml='';
+
+  if(isDual){
+    order.forEach(id=>{
+      if(!moduleEnabled[id])return;
+      if(id==='education'||id==='cert')return;
+      const mod=MODULES.find(m=>m.id===id);
+      if(id==='skill'){const sk=d.skill.filter(s=>s);if(sk.length)mainHtml+=secSk(sk,mod.name)}
+      else if(id==='self'){if(d.self.trim())mainHtml+=secSelf(d.self,mod.name)}
+      else{const entries=d[id].filter(e=>Object.values(e).some(v=>v&&String(v).trim()));if(entries.length){mainHtml+=`<div class="sec"><div class="sec-tt">${mod.name}</div>`;entries.forEach(e=>{mainHtml+=item(id,e)});mainHtml+='</div>'}}
+    });
+    el.innerHTML=renderDual(d,mainHtml);
+  }else{
+    let hd=moduleEnabled.basic?renderHd(d.basic,tpl):'';
+    order.forEach(id=>{
+      if(!moduleEnabled[id])return;
+      const mod=MODULES.find(m=>m.id===id);
+      if(id==='skill'){const sk=d.skill.filter(s=>s);if(sk.length)mainHtml+=secSk(sk,mod.name,tpl==='compact'?'sec sec-full':'sec')}
+      else if(id==='self'){if(d.self.trim())mainHtml+=secSelf(d.self,mod.name,tpl==='compact'?'sec sec-full':'sec')}
+      else{const entries=d[id].filter(e=>Object.values(e).some(v=>v&&String(v).trim()));if(entries.length){const cls=tpl==='compact'?'sec':'sec';mainHtml+=`<div class="${cls}"><div class="sec-tt">${mod.name}</div>`;entries.forEach(e=>{mainHtml+=item(id,e)});mainHtml+='</div>'}}
+    });
+    el.innerHTML=hd+`<div class="bd">${mainHtml}</div>`;
+  }
+}
+
+function renderHd(b,tpl){
+  const c=[b.phone,b.email,b.wechat].filter(Boolean);
+  const cHtml=c.map(s=>`<span>${esc(s)}</span>`).join('');
+  const photoHtml=b.photo?`<img class="hd-photo" src="${b.photo}">`:'';
+  if(tpl==='classic'){
+    return`<div class="hd">${photoHtml}<div class="hd-name">${esc(b.name)||'你的姓名'}</div>${b.objective?`<div class="hd-obj">${esc(b.objective)}</div>`:''}${c.length?`<div class="hd-contact">${cHtml}</div>`:''}</div>`;
+  }
+  return`<div class="hd">${photoHtml}<div class="hd-info"><div class="hd-name">${esc(b.name)||'你的姓名'}</div>${b.objective?`<div class="hd-obj">求职意向：${esc(b.objective)}</div>`:''}${c.length?`<div class="hd-contact">${cHtml}</div>`:''}</div></div>`;
+}
+
+function item(modId,e){
+  switch(modId){
+    case'education':return`<div class="it"><div class="it-hd"><span class="it-name">${esc(e.school)}</span><span class="it-time">${esc(e.time)}</span></div><div class="it-sub">${esc(e.major)} · ${esc(e.degree)}${e.gpa?' · GPA: '+esc(e.gpa):''}</div></div>`;
+    case'internship':return`<div class="it"><div class="it-hd"><span class="it-name">${esc(e.company)} — ${esc(e.position)}</span><span class="it-time">${esc(e.time)}</span></div><div class="it-desc">${fmtD(e.desc)}</div></div>`;
+    case'project':return`<div class="it"><div class="it-hd"><span class="it-name">${esc(e.name)}${e.role?' · '+esc(e.role):''}</span><span class="it-time">${esc(e.time)}</span></div><div class="it-desc">${fmtD(e.desc)}</div></div>`;
+    case'honor':return`<div class="it"><div class="it-hd"><span class="it-name">${esc(e.title)}</span><span class="it-time">${esc(e.time)}</span></div>${e.issuer?`<div class="it-sub">${esc(e.issuer)}</div>`:''}</div>`;
+    case'club':return`<div class="it"><div class="it-hd"><span class="it-name">${esc(e.org)} — ${esc(e.role)}</span><span class="it-time">${esc(e.time)}</span></div><div class="it-desc">${fmtD(e.desc)}</div></div>`;
+    case'volunteer':return`<div class="it"><div class="it-hd"><span class="it-name">${esc(e.activity)}</span><span class="it-time">${esc(e.time)}</span></div><div class="it-desc">${fmtD(e.desc)}</div></div>`;
+    case'cert':return`<div class="it"><div class="it-hd"><span class="it-name">${esc(e.name)}</span><span class="it-time">${esc(e.time)}</span></div></div>`;
+    default:return'';
+  }
+}
+
+function secSk(skills,name,cls){return`<div class="${cls||'sec'}"><div class="sec-tt">${name}</div><div class="sk-grid">${skills.map(s=>`<span class="sk-tag">${esc(s)}</span>`).join('')}</div></div>`}
+function secSelf(text,name,cls){return`<div class="${cls||'sec'}"><div class="sec-tt">${name}</div><div class="self-tx">${renderMarkdown(text)}</div></div>`}
+
+function fmtD(text){if(!text)return'';const lines=text.split('\n').filter(s=>s.trim());if(lines.length<=1)return esc(text).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');return'<ul>'+lines.map(l=>{let t=esc(l.replace(/^[-•·]\s*/,''));t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');return`<li>${t}</li>`}).join('')+'</ul>'}
+
+function renderDual(d,mainHtml){
+  const b=d.basic;
+  let side='';
+  if(b.photo)side+=`<img class="side-photo" src="${b.photo}">`;
+  side+=`<div class="side-name">${esc(b.name)||'你的姓名'}</div>`;
+  if(b.objective)side+=`<div class="side-obj">${esc(b.objective)}</div>`;
+  side+=`<div class="side-line"></div>`;
+  side+=`<div class="side-sec"><div class="side-tt">联系方式</div>`;
+  if(b.phone)side+=`<div class="side-item"><strong>电话</strong>${esc(b.phone)}</div>`;
+  if(b.email)side+=`<div class="side-item"><strong>邮箱</strong>${esc(b.email)}</div>`;
+  if(b.wechat)side+=`<div class="side-item"><strong>微信</strong>${esc(b.wechat)}</div>`;
+  side+=`</div>`;
+  const skills=d.skill.filter(s=>s);
+  if(moduleEnabled.skill&&skills.length){
+    side+=`<div class="side-sec"><div class="side-tt">专业技能</div>`;
+    skills.forEach((s,i)=>{const pct=Math.max(70,95-i*4);side+=`<div class="side-sk"><div class="side-sk-nm">${esc(s)}<span>${pct}%</span></div><div class="side-sk-bar"><div class="side-sk-fill" style="width:${pct}%"></div></div></div>`});
+    side+=`</div>`;
+  }
+  if(moduleEnabled.education){
+    const edu=d.education.filter(e=>Object.values(e).some(v=>v&&String(v).trim()));
+    if(edu.length){side+=`<div class="side-sec"><div class="side-tt">教育背景</div>`;edu.forEach(e=>{side+=`<div class="side-item"><strong>${esc(e.time)}</strong>${esc(e.school)}<br>${esc(e.major)} · ${esc(e.degree)}${e.gpa?'<br>GPA: '+esc(e.gpa):''}</div>`});side+=`</div>`}
+  }
+  if(moduleEnabled.cert){
+    const certs=d.cert.filter(e=>e.name&&e.name.trim());
+    if(certs.length){side+=`<div class="side-sec"><div class="side-tt">证书资质</div>`;certs.forEach(e=>{side+=`<div class="side-item">${esc(e.name)}<br><span style="color:#94a3b8;font-size:11px">${esc(e.time)}</span></div>`});side+=`</div>`}
+  }
+  return`<div class="side">${side}</div><div class="main-sec">${mainHtml}</div>`;
+}
+
+// ===== PDF Export =====
+document.getElementById('btnExportPDF').addEventListener('click',()=>{
+  exportWrap.classList.remove('open');
+  const el=document.getElementById('resumePreview');
+  document.body.classList.add('export-mode');
+  showToast('正在生成 PDF...');
+  html2pdf().set({margin:0,filename:(resumeData.basic.name||'简历')+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(el).save().then(()=>{document.body.classList.remove('export-mode');showToast('PDF 导出成功')}).catch(()=>{document.body.classList.remove('export-mode');showToast('PDF 导出失败')});
+});
+
+// ===== Image Export =====
+document.getElementById('btnExportImg').addEventListener('click',()=>{
+  exportWrap.classList.remove('open');
+  const el=document.getElementById('resumePreview');
+  document.body.classList.add('export-mode');
+  showToast('正在生成图片...');
+  html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#fff'}).then(canvas=>{
+    document.body.classList.remove('export-mode');
+    canvas.toBlob(blob=>{
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=(resumeData.basic.name||'简历')+'.png';
+      document.body.appendChild(a);a.click();
+      setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},100);
+      showToast('图片导出成功');
+    },'image/png');
+  }).catch(()=>{document.body.classList.remove('export-mode');showToast('图片导出失败')});
+});
+
+// ===== Word Export =====
+document.getElementById('btnExportWord').addEventListener('click',()=>{
+  exportWrap.classList.remove('open');
+  if(!window.__docxReady||!window.docx){showToast('Word 库加载中，请稍后再试...');return}
+  showToast('正在生成 Word...');
+  try{exportToWord()}catch(e){console.error(e);showToast('Word 导出失败：'+e.message)}
+});
+
+function exportToWord(){
+  const d=resumeData;
+  const {Document,Packer,Paragraph,TextRun,AlignmentType,BorderStyle,convertInchesToTwip}=window.docx;
+  const order=moduleOrder.filter(id=>id!=='basic');
+
+  const FONT='Microsoft YaHei';
+  const FONT_EN='Calibri';
+  const COLOR_BODY='374151';
+  const COLOR_SUB='6B7280';
+
+  const tplColors={
+    classic:{primary:'555555',heading:'111111',accent:'555555'},
+    modern:{primary:'555555',heading:'111111',accent:'555555'},
+    sidebar:{primary:'555555',heading:'111111',accent:'555555'},
+    darkside:{primary:'555555',heading:'111111',accent:'555555'},
+    compact:{primary:'555555',heading:'111111',accent:'555555'}
+  };
+  const colors=tplColors[currentTemplate]||tplColors.classic;
+
+  function mkP(text,opts={}){
+    return new Paragraph({
+      spacing:{after:opts.afterPt||0,before:opts.beforePt||0,line:opts.linePt||276},
+      alignment:opts.align||AlignmentType.LEFT,
+      children:Array.isArray(text)?text:[new TextRun({text:String(text||''),font:{name:opts.font||FONT,eastAsia:FONT},size:opts.sizePt?opts.sizePt*2:26,color:opts.color||COLOR_BODY,bold:opts.bold||false})],
+    });
+  }
+
+  function headingLine(text){
+    return new Paragraph({
+      spacing:{before:300,after:120,line:276},
+      border:{bottom:{style:BorderStyle.SINGLE,size:6,color:colors.primary,space:4}},
+      children:[
+        new TextRun({text:'| ',font:{name:FONT_EN},size:4,color:colors.primary,bold:true}),
+        new TextRun({text:text,font:{name:FONT,eastAsia:FONT},size:28,color:colors.heading,bold:true})
+      ]
+    });
+  }
+
+  function entryLine(name,time,subtitle,descLines){
+    const paras=[];
+    const titleRuns=[];
+    if(name)titleRuns.push(new TextRun({text:name,font:{name:FONT,eastAsia:FONT},size:24,color:colors.heading,bold:true}));
+    if(time)titleRuns.push(new TextRun({text:'    '+time,font:{name:FONT,eastAsia:FONT},size:22,color:colors.accent}));
+    if(titleRuns.length)paras.push(new Paragraph({spacing:{before:140,after:40,line:276},children:titleRuns}));
+    if(subtitle)paras.push(new Paragraph({spacing:{after:40,line:276},children:[new TextRun({text:subtitle,font:{name:FONT,eastAsia:FONT},size:22,color:COLOR_SUB})]}));
+    if(descLines&&descLines.length){
+      descLines.forEach(line=>{
+        paras.push(new Paragraph({spacing:{after:20,line:276},indent:{left:convertInchesToTwip(0.2)},children:[new TextRun({text:'• '+line,font:{name:FONT,eastAsia:FONT},size:22,color:COLOR_BODY})]}));
+      });
+    }
+    return paras;
+  }
+
+  function parseDesc(text){if(!text)return[];return text.split('\n').map(s=>s.trim().replace(/^[-•·]\s*/,'').replace(/\*\*(.+?)\*\*/g,'$1')).filter(Boolean)}
+
+  const children=[];
+  const b=d.basic;
+  children.push(mkP(b.name||'你的姓名',{sizePt:22,color:colors.heading,bold:true,afterPt:60,align:AlignmentType.CENTER}));
+
+  const contactParts=[b.phone,b.email,b.wechat].filter(Boolean);
+  if(contactParts.length){
+    const runs=contactParts.map((s,i)=>new TextRun({text:(i>0?'  |  ':'')+s,font:{name:FONT,eastAsia:FONT},size:20,color:COLOR_SUB}));
+    children.push(new Paragraph({spacing:{after:b.objective?40:120,line:276},alignment:AlignmentType.CENTER,children:runs}));
+  }
+  if(b.objective){children.push(mkP('求职意向：'+b.objective,{sizePt:22,color:colors.accent,bold:true,afterPt:160,align:AlignmentType.CENTER}))}
+
+  order.forEach(id=>{
+    if(!moduleEnabled[id])return;
+    const mod=MODULES.find(m=>m.id===id);
+    if(id==='skill'){
+      const sk=d.skill.filter(s=>s);if(!sk.length)return;
+      children.push(headingLine(mod.name));
+      const runs=[];
+      sk.forEach((s,i)=>{if(i>0)runs.push(new TextRun({text:'  ·  ',font:{name:FONT_EN},size:22,color:COLOR_SUB}));runs.push(new TextRun({text:s,font:{name:FONT,eastAsia:FONT},size:22,color:colors.primary,bold:true}))});
+      children.push(new Paragraph({spacing:{after:100,line:276},children:runs}));return;
+    }
+    if(id==='self'){if(!d.self||!d.self.trim())return;children.push(headingLine(mod.name));d.self.split('\n').forEach(line=>{if(line.trim())children.push(mkP(line.trim().replace(/\*\*(.+?)\*\*/g,'$1'),{sizePt:21,afterPt:40}))});return}
+    const entries=d[id].filter(e=>Object.values(e).some(v=>v&&String(v).trim()));if(!entries.length)return;
+    children.push(headingLine(mod.name));
+    entries.forEach(e=>{
+      switch(id){
+        case'education':entryLine(e.school,e.time,e.major+' · '+e.degree+(e.gpa?' · GPA: '+e.gpa:'')).forEach(p=>children.push(p));break;
+        case'internship':entryLine(e.company+' — '+e.position,e.time,null,parseDesc(e.desc)).forEach(p=>children.push(p));break;
+        case'project':entryLine(e.name+(e.role?' · '+e.role:''),e.time,null,parseDesc(e.desc)).forEach(p=>children.push(p));break;
+        case'honor':entryLine(e.title,e.time,e.issuer||null).forEach(p=>children.push(p));break;
+        case'club':entryLine(e.org+' — '+e.role,e.time,null,parseDesc(e.desc)).forEach(p=>children.push(p));break;
+        case'volunteer':entryLine(e.activity,e.time,null,parseDesc(e.desc)).forEach(p=>children.push(p));break;
+        case'cert':entryLine(e.name,e.time).forEach(p=>children.push(p));break;
+      }
+    });
+  });
+
+  const doc=new Document({
+    styles:{default:{document:{run:{font:{name:FONT,eastAsia:FONT},size:26}}}},
+    sections:[{properties:{page:{margin:{top:convertInchesToTwip(0.8),bottom:convertInchesToTwip(0.8),left:convertInchesToTwip(1),right:convertInchesToTwip(1)}}},children:children}]
+  });
+
+  Packer.toBlob(doc).then(blob=>{
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(resumeData.basic.name||'简历')+'.docx';
+    document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},100);showToast('Word 导出成功');
+  }).catch(e=>{showToast('Word 导出失败');console.error(e)});
+}
+
+// ===== Clear =====
+document.getElementById('btnClear').addEventListener('click',()=>{
+  if(!confirm('确定要清空所有已填写的内容吗？此操作不可撤销。'))return;
+  captureUndo();resumeData=getDefaultData();moduleEnabled={};MODULES.forEach(m=>moduleEnabled[m.id]=m.id==='basic');openModules={basic:true};moduleOrder=MODULES.map(m=>m.id);
+  localStorage.removeItem('resumeData');localStorage.removeItem('moduleEnabled');localStorage.removeItem('moduleOrder');renderEditor();renderPreview();showToast('已清空所有内容');
+});
+
+// ===== Init =====
+loadFromLocal();
+document.querySelectorAll('.tpl-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.tpl===currentTemplate));
+renderEditor();renderPreview();
+</script>
+</body>
+</html>
